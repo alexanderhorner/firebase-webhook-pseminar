@@ -21,10 +21,18 @@ exports.pushData = functions
         // Grab the text parameter.
         const data:TheThingsNetWebhookBody = req.body;
 
-        let decodedPayload
+        let decodedPayload, timestampReceivedAt
 
         try {
             decodedPayload = data.uplink_message.decoded_payload
+            timestampReceivedAt = data.uplink_message.received_at
+
+            if (decodedPayload == null) {
+                throw "decoded_payload empty"
+            }
+            if (timestampReceivedAt == null) {
+                throw "received_at empty"
+            }
         } catch (error) {
             res.json({
                 status: "error",
@@ -33,14 +41,21 @@ exports.pushData = functions
             return
         }
 
+        const databaseEntry = {
+            ...decodedPayload,
+            timestamp: timestampReceivedAt
+        }
+
         functions.logger.log(JSON.stringify(decodedPayload))
 
-        const databaseResponse = admin.database().ref('/').set(decodedPayload)
+        const databaseResponseCurrentData = admin.database().ref('/currentData').set(databaseEntry)
+        const databaseResponseHistory = admin.database().ref('/history').push().set(databaseEntry)
 
-        // Push the new message into Firestore using the Firebase Admin SDK.
-        // Send back a message that we've successfully written the message
         res.json({
             status: "success",
-            data: databaseResponse
+            data: {
+                databaseResponseCurrentData,
+                databaseResponseHistory
+            }
         });
     })
