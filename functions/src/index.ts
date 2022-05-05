@@ -1,5 +1,7 @@
 import * as functions from "firebase-functions"
 import * as admin from "firebase-admin"
+// import { getAuth } from "@firebase/auth"
+
 import { TheThingsNetWebhookBody } from "./requestdata"
 
 admin.initializeApp(functions.config().firebase)
@@ -8,7 +10,12 @@ exports.pushData = functions
     .region('europe-west1')
     .https.onRequest(async (req, res) => {
 
-        if (req.headers.authorization !== "Basic QmF5ZXJubGFiMTotd0Bja302Y2UnLSk9WV91bWVqNnV0VlJSVU4tJmBSUQ==") {
+        const username = process.env.USERNAME
+        const password = process.env.PASSWORD
+
+        const authToken = Buffer.from(`${username}:${password}`).toString('base64')
+
+        if (req.headers.authorization !== `Basic ${authToken}`) {
             res.json({
                 status: "error",
                 message: "Auth failed"
@@ -16,7 +23,6 @@ exports.pushData = functions
             functions.logger.error("Auth failed")
             return
         }
-
 
         // Grab the text parameter.
         const data:TheThingsNetWebhookBody = req.body;
