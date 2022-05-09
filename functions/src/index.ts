@@ -1,6 +1,5 @@
 import * as functions from "firebase-functions"
 import * as admin from "firebase-admin"
-// import { getAuth } from "@firebase/auth"
 
 import { TheThingsNetWebhookBody } from "./requestdata"
 
@@ -10,58 +9,61 @@ exports.pushData = functions
     .region('europe-west1')
     .https.onRequest(async (req, res) => {
 
-        const username = process.env.USERNAME
-        const password = process.env.PASSWORD
+
+        // Verify login data in basic auth header
+        const username = process.env.BASIC_AUTH_USERNAME
+        const password = process.env.BASIC_AUTH_PASSWORD
 
         const authToken = Buffer.from(`${username}:${password}`).toString('base64')
 
         if (req.headers.authorization !== `Basic ${authToken}`) {
             res.json({
                 status: "error",
-                message: "Auth failed"
+                message: "Auth Error: Basic Auth failed"
             })
-            functions.logger.error("Auth failed")
-            return
+            throw new Error("Basic Auth failed")
         }
 
-        // Grab the text parameter.
+
+        // Grab relevant data from the data recieved 
         const data:TheThingsNetWebhookBody = req.body;
 
-        let decodedPayload, timestampReceivedAt
+        const decodedPayload = data.uplink_message.decoded_payload
+        const timestampReceivedAt = data.uplink_message.received_at
 
-        try {
-            decodedPayload = data.uplink_message.decoded_payload
-            timestampReceivedAt = data.uplink_message.received_at
-
-            if (decodedPayload == null) {
-                throw "decoded_payload empty"
-            }
-            if (timestampReceivedAt == null) {
-                throw "received_at empty"
-            }
-        } catch (error) {
+        if (decodedPayload == null) {
+            const message = "Payload error: decoded_payload empty"
             res.json({
                 status: "error",
-                message: `Error: ${error}`
+                message
             })
-            return
+            throw new Error(message)
+        }
+        if (timestampReceivedAt == null) {
+            const message = "Payload error: received_at empty"
+            res.json({
+                status: "error",
+                message
+            })
+            throw new Error(message)
         }
 
+
+        // Push data to database
         const databaseEntry = {
             ...decodedPayload,
             timestamp: timestampReceivedAt
         }
 
-        functions.logger.log(JSON.stringify(decodedPayload))
+        functions.logger.log(JSON.stringify(databaseEntry))
 
-        const databaseResponseCurrentData = admin.database().ref('/currentData').set(databaseEntry)
-        const databaseResponseHistory = admin.database().ref('/history').push().set(databaseEntry)
+        admin.database().ref('/currentData').set(databaseEntry)
+        admin.database().ref('/history').push().set(databaseEntry)
 
         res.json({
             status: "success",
-            data: {
-                databaseResponseCurrentData,
-                databaseResponseHistory
-            }
-        });
+            data: null
+        })
+
+
     })
