@@ -57,13 +57,13 @@ exports.pushData = functions
         } catch (error) {
             
             let errorMessage
-            if (typeof error === "string") {
-                errorMessage = error
-            } else if (error instanceof Error) {
+            if (error instanceof Error) {
                 errorMessage = error.message
             } else {
                 errorMessage = error
             }
+
+            functions.logger.error(errorMessage)
             
             // Send webhook error response in case something goes wrong
             res.json({
